@@ -1,0 +1,73 @@
+{
+  "hash": "069fd01a",
+  "configHash": "cd35b833",
+  "lockfileHash": "3ca47bc2",
+  "browserHash": "c718751b",
+  "optimized": {
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "390dcccb",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "f94fd341",
+      "needsInterop": true
+    },
+    "framer-motion": {
+      "src": "../../node_modules/framer-motion/dist/es/index.mjs",
+      "file": "framer-motion.js",
+      "fileHash": "dc747e09",
+      "needsInterop": false
+    },
+    "react-datepicker": {
+      "src": "../../node_modules/react-datepicker/dist/index.es.js",
+      "file": "react-datepicker.js",
+      "fileHash": "cfae5549",
+      "needsInterop": false
+    },
+    "firebase/auth": {
+      "src": "../../node_modules/firebase/auth/dist/esm/index.esm.js",
+      "file": "firebase_auth.js",
+      "fileHash": "df92550e",
+      "needsInterop": false
+    },
+    "firebase/app": {
+      "src": "../../node_modules/firebase/app/dist/esm/index.esm.js",
+      "file": "firebase_app.js",
+      "fileHash": "9e26e809",
+      "needsInterop": false
+    },
+    "firebase/firestore": {
+      "src": "../../node_modules/firebase/firestore/dist/esm/index.esm.js",
+      "file": "firebase_firestore.js",
+      "fileHash": "14cb0566",
+      "needsInterop": false
+    },
+    "firebase/analytics": {
+      "src": "../../node_modules/firebase/analytics/dist/esm/index.esm.js",
+      "file": "firebase_analytics.js",
+      "fileHash": "d0e6abe8",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "chunk-XNLU4CTU": {
+      "file": "chunk-XNLU4CTU.js"
+    },
+    "chunk-ZCPZUSAS": {
+      "file": "chunk-ZCPZUSAS.js"
+    },
+    "chunk-O2Q6JZ3H": {
+      "file": "chunk-O2Q6JZ3H.js"
+    },
+    "chunk-C3NULHJY": {
+      "file": "chunk-C3NULHJY.js"
+    },
+    "chunk-DC5AMYBS": {
+      "file": "chunk-DC5AMYBS.js"
+    }
+  }
+}
