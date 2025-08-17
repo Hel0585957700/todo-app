@@ -1,20 +1,17 @@
 import React, { useState, useEffect } from "react";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { auth, db } from "./firebase/firebase";
+
 import Login from "./components/Login";
 import Register from "./components/Register";
 import TasksList from "./components/TasksList";
 import FloatingMenu from "./components/FloatingMenu";
 import AddOrEditTaskModal from "./components/AddOrEditTaskModal";
+
 import GROOM_TASKS from "./data/groomTasks";
 import BRIDE_TASKS from "./data/brideTasks";
 import BAR_MITZVA_TASKS from "./data/barMitzvaTasks";
-import {
-  saveUserToStorage,
-  loadUserFromStorage,
-  getAllUserEmails,
-  saveTasksToStorage,
-  loadTasksFromStorage,
-  addUserToIndex,
-} from "./utils/storage";
 
 const TASKS_BY_TYPE = {
   חתן: GROOM_TASKS,
@@ -24,59 +21,85 @@ const TASKS_BY_TYPE = {
 
 export default function App() {
   const [step, setStep] = useState("login");
-  const [email, setEmail] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editIndex, setEditIndex] = useState(null);
 
-  // טעינה ראשונית: אם אין משתמשים — עובר אוטומטית ל-register
+  // מאזין למצב התחברות Firebase
   useEffect(() => {
-    const users = getAllUserEmails();
-    if (users.length === 0) setStep("register");
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // משוך פרטים נוספים על המשתמש מה־Firestore
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        const userData = userDoc.exists() ? userDoc.data() : {};
+        setCurrentUser({ uid: user.uid, email: user.email, ...userData });
+
+        // משוך משימות
+        const tasksDoc = await getDoc(doc(db, "tasks", user.uid));
+        if (tasksDoc.exists()) {
+          setTasks(tasksDoc.data().list || []);
+        } else {
+          setTasks([]);
+        }
+
+        setStep("tasks");
+      } else {
+        setCurrentUser(null);
+        setTasks([]);
+        setStep("login");
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
-  // שמירת משימות אוטומטית
+  // שמירת משימות ל־Firestore בכל שינוי
   useEffect(() => {
-    if (currentUser && currentUser.email) {
-      saveTasksToStorage(currentUser.email, tasks);
+    if (currentUser && currentUser.uid) {
+      setDoc(doc(db, "tasks", currentUser.uid), { list: tasks });
     }
   }, [tasks, currentUser]);
 
   // Register handler
-  function handleRegister(form) {
-    console.log("נרשם משתמש:", form);
-    if (!form.email) {
-      alert("יש למלא אימייל!");
-      return;
-    }
-    saveUserToStorage(form);
-    addUserToIndex(form.email);
-    setEmail(form.email);
-    setCurrentUser(form);
-    // משימות ברירת מחדל:
+  async function handleRegister(form) {
+    // אחרי שה־Register.jsx עשה signUp וקיבלנו משתמש מה־auth
+    const user = auth.currentUser;
+    if (!user) return;
+
+    // שמור פרטים נוספים על המשתמש ב־Firestore
+    await setDoc(doc(db, "users", user.uid), {
+      email: form.email,
+      firstName: form.firstName,
+      lastName: form.lastName,
+      phone: form.phone,
+      nickname: form.nickname,
+      eventType: form.eventType,
+    });
+
+    // צור משימות ברירת מחדל לפי סוג אירוע
     const rawTasks = TASKS_BY_TYPE[form.eventType] || [];
     const fixedTasks = rawTasks.map((task) =>
       typeof task === "string" ? { text: task, status: "todo" } : task
     );
     setTasks(fixedTasks);
+
+    await setDoc(doc(db, "tasks", user.uid), { list: fixedTasks });
+
+    setCurrentUser({ uid: user.uid, ...form });
     setStep("tasks");
   }
 
   // Login handler
-  function handleLogin(emailInput) {
-    const user = loadUserFromStorage(emailInput);
-    if (user) {
-      setCurrentUser(user);
-      setEmail(user.email);
-      // טען משימות למשתמש זה:
-      const tasksFromStorage = loadTasksFromStorage(user.email);
-      setTasks(tasksFromStorage.length > 0 ? tasksFromStorage : []);
-      setStep("tasks");
-    } else {
-      alert("משתמש לא נמצא! אנא הירשם.");
-      setStep("register");
-    }
+  async function handleLogin() {
+    // כאן אין צורך – Firebase כבר מטפל דרך onAuthStateChanged
+  }
+
+  // Logout handler
+  async function handleLogout() {
+    await signOut(auth);
+    setCurrentUser(null);
+    setTasks([]);
+    setStep("login");
   }
 
   // הוספת משימה חדשה
@@ -122,8 +145,6 @@ export default function App() {
     <div className="app-container">
       {step === "login" && (
         <Login
-          email={email}
-          setEmail={setEmail}
           onLogin={handleLogin}
           onRegister={() => setStep("register")}
         />
@@ -139,9 +160,10 @@ export default function App() {
       {step === "tasks" && (
         <div className="card">
           <h2>
-            שלום {currentUser?.firstName}! המשימות שלך ({currentUser?.eventType}
-            ):
+            שלום {currentUser?.firstName || currentUser?.email}! המשימות שלך (
+            {currentUser?.eventType})
           </h2>
+          <button onClick={handleLogout}>התנתק</button>
           <TasksList
             tasks={tasks}
             onTaskClick={handleTaskClick}
@@ -152,7 +174,7 @@ export default function App() {
       )}
 
       <FloatingMenu
-        onAddUser={() => alert("חיבור משתמש - בקרוב!")}
+        onAddUser={() => alert("ניהול משתמשים - בקרוב!")}
         onAddTask={openAddTaskModal}
         onChatAI={() => alert("דו שיח עם AI - בקרוב!")}
       />

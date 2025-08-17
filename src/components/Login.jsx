@@ -1,55 +1,59 @@
 import React, { useState } from "react";
-import { signIn } from "../authService"; // לוודא שיש לך את הקובץ הזה כמו ששלחתי קודם
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../firebase/firebase";
 
-export default function Login({ onLogin, onRegister }) {
+export default function Login({ onRegister }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  async function handleSubmit(e) {
+  async function handleLogin(e) {
     e.preventDefault();
-    if (!email || !password) {
-      alert("יש למלא גם אימייל וגם סיסמה!");
-      return;
-    }
-    setLoading(true);
     try {
-      // התחברות אמיתית ל-Firebase
-      await signIn(email, password);
-      if (onLogin) {
-        onLogin(email); // תעביר הלאה לממשק שלך
-      }
-    } catch (error) {
-      alert(error.message || "שגיאה בהתחברות");
-    } finally {
-      setLoading(false);
+      await signInWithEmailAndPassword(auth, email, password);
+      setError("");
+      // אין צורך ב-onLogin כי App.jsx מאזין ל-onAuthStateChanged
+    } catch (err) {
+      console.error(err);
+      setError("שגיאה בהתחברות. בדוק אימייל או סיסמה.");
     }
   }
 
   return (
-    <div className="card">
-      <h2>ברוך הבא! התחבר או הירשם</h2>
-      <form onSubmit={handleSubmit} autoComplete="off">
-        <input
-          type="email"
-          placeholder="אימייל"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <input
-          type="password"
-          placeholder="סיסמה"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-        <button type="submit" style={{ width: "100%" }} disabled={loading}>
-          {loading ? "מתחבר..." : "המשך"}
-        </button>
+    <div className="login-container">
+      <h2>כניסה לחשבון</h2>
+      <form onSubmit={handleLogin}>
+        <div>
+          <label>אימייל:</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+
+        <div>
+          <label>סיסמה:</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
+
+        {error && <p style={{ color: "red" }}>{error}</p>}
+
+        <button type="submit">התחבר</button>
       </form>
-      <br />
-      <button onClick={onRegister}>אין לי משתמש</button>
+
+      <hr />
+
+      <div style={{ marginTop: "1rem" }}>
+        <p>אין לי חשבון?</p>
+        <button onClick={onRegister}>פתח חשבון חדש</button>
+      </div>
     </div>
   );
 }
