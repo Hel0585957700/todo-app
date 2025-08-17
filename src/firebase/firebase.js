@@ -7,13 +7,13 @@ import { getAnalytics } from "firebase/analytics";
 
 // קוד config שקיבלת (תיקנתי את storageBucket)
 const firebaseConfig = {
-  apiKey: "AIzaSyAAOzm_e-ehEIBkZ8NnrwbayiCyLt4KESQ",
-  authDomain: "todo-770.firebaseapp.com",
-  projectId: "todo-770",
-  storageBucket: "todo-770.appspot.com", // <--- כך נכון!
-  messagingSenderId: "912634383860",
-  appId: "1:912634383860:web:4b8fff086b5fce5fa17da1",
-  measurementId: "G-K2NWSN2YEZ",
+  apiKey: "AIzaSyAkvTRw0RMINTR9Vj2JfHZh1ZWpAL02RQY",
+  authDomain: "todo-messimot.firebaseapp.com",
+  projectId: "todo-messimot",
+  storageBucket: "todo-messimot.firebasestorage.app",
+  messagingSenderId: "817690742904",
+  appId: "1:817690742904:web:3709eef6e5abeaa67edd8d",
+  measurementId: "G-BX281FQZW1"
 };
 
 // Initialize Firebase once בלבד!

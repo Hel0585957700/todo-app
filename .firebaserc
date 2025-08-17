@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "todo-770"
-  }
+    "default": "todo-messimot",
+    "todo-messimot": "todo-messimot"
+  },
+  "targets": {},
+  "etags": {}
 }
