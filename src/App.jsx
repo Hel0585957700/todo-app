@@ -60,6 +60,14 @@ export default function App() {
     }
   }, [tasks, currentUser]);
 
+  // שמירת משימות אוטומטית
+useEffect(() => {
+  if (!currentUser) return;
+
+  const unsubscribe = subscribeUserTodos(currentUser.uid, setTasks);
+  return () => unsubscribe();
+}, [currentUser]);
+
   // Register handler
   async function handleRegister(form) {
     // אחרי שה־Register.jsx עשה signUp וקיבלנו משתמש מה־auth
@@ -102,10 +110,22 @@ export default function App() {
     setStep("login");
   }
 
-  // הוספת משימה חדשה
-  function handleAddTask(newTask) {
-    setTasks((tasks) => [newTask, ...tasks]);
-  }
+function handleAddTask(newTaskText) {
+  if (!newTaskText) return;
+
+  // רשימת משתמשים שמורשים לראות את המשימה
+  const allowedUsers = [currentUser.uid, "UID_OF_OTHER_USER"]; // אפשר להוסיף כמה משתמשים לפי הצורך
+
+  // שמירה ל-Firebase
+  addTodo(newTaskText, allowedUsers);
+
+  // הוספה ל-State כדי שה-UI יתעדכן מיד (optional)
+  setTasks((tasks) => [
+    { text: newTaskText, done: false, allowedUsers },
+    ...tasks
+  ]);
+}
+
 
   // עריכת משימה קיימת
   function handleEditTask(editedTask) {
