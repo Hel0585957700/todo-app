@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from "react";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { auth, db } from "./firebase/firebase";
+import { signOut } from "firebase/auth";
+import { auth } from "./firebase/firebase";
 
+// Components
 import Login from "./components/Login";
 import Register from "./components/Register";
 import TasksList from "./components/TasksList";
 import FloatingMenu from "./components/FloatingMenu";
 import AddOrEditTaskModal from "./components/AddOrEditTaskModal";
 
+// Services & Hooks
+import { subscribeToAuth, saveUserData } from "./services/userService";
+import { useTasks } from "./hooks/useTasks";
+
+// Data
 import GROOM_TASKS from "./data/groomTasks";
 import BRIDE_TASKS from "./data/brideTasks";
 import BAR_MITZVA_TASKS from "./data/barMitzvaTasks";
@@ -22,152 +27,158 @@ const TASKS_BY_TYPE = {
 export default function App() {
   const [step, setStep] = useState("login");
   const [currentUser, setCurrentUser] = useState(null);
-  const [tasks, setTasks] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editIndex, setEditIndex] = useState(null);
+  const [editTaskId, setEditTaskId] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // מאזין למצב התחברות Firebase
+  // שימוש ב-custom hook לניהול משימות
+  const {
+    tasks,
+    addTask,
+    toggleTask,
+    editTask,
+    setReminder,
+    deleteTask,
+    createDefaultTasks
+  } = useTasks(currentUser);
+
+  // אזנה למצב התחברות Firebase
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        // משוך פרטים נוספים על המשתמש מה־Firestore
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        const userData = userDoc.exists() ? userDoc.data() : {};
-        setCurrentUser({ uid: user.uid, email: user.email, ...userData });
-
-        // משוך משימות
-        const tasksDoc = await getDoc(doc(db, "tasks", user.uid));
-        if (tasksDoc.exists()) {
-          setTasks(tasksDoc.data().list || []);
-        } else {
-          setTasks([]);
-        }
-
-        setStep("tasks");
-      } else {
-        setCurrentUser(null);
-        setTasks([]);
-        setStep("login");
-      }
+    const unsubscribe = subscribeToAuth((user) => {
+      console.log('Auth state changed:', user);
+      setCurrentUser(user);
+      setStep(user ? "tasks" : "login");
+      setLoading(false);
     });
+    
     return () => unsubscribe();
   }, []);
 
-  // שמירת משימות ל־Firestore בכל שינוי
-  useEffect(() => {
-    if (currentUser && currentUser.uid) {
-      setDoc(doc(db, "tasks", currentUser.uid), { list: tasks });
-    }
-  }, [tasks, currentUser]);
-
-  // שמירת משימות אוטומטית
-useEffect(() => {
-  if (!currentUser) return;
-
-  const unsubscribe = subscribeUserTodos(currentUser.uid, setTasks);
-  return () => unsubscribe();
-}, [currentUser]);
-
   // Register handler
   async function handleRegister(form) {
-    // אחרי שה־Register.jsx עשה signUp וקיבלנו משתמש מה־auth
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user) {
+      console.error("No authenticated user found");
+      return;
+    }
 
-    // שמור פרטים נוספים על המשתמש ב־Firestore
-    await setDoc(doc(db, "users", user.uid), {
-      email: form.email,
-      firstName: form.firstName,
-      lastName: form.lastName,
-      phone: form.phone,
-      nickname: form.nickname,
-      eventType: form.eventType,
-    });
+    setLoading(true);
+    try {
+      // שמירת נתוני המשתמש
+      const success = await saveUserData(user.uid, {
+        email: form.email,
+        firstName: form.firstName,
+        lastName: form.lastName,
+        phone: form.phone,
+        nickname: form.nickname,
+        eventType: form.eventType,
+      });
 
-    // צור משימות ברירת מחדל לפי סוג אירוע
-    const rawTasks = TASKS_BY_TYPE[form.eventType] || [];
-    const fixedTasks = rawTasks.map((task) =>
-      typeof task === "string" ? { text: task, status: "todo" } : task
-    );
-    setTasks(fixedTasks);
+      if (!success) {
+        alert("שגיאה בשמירת נתוני המשתמש");
+        return;
+      }
 
-    await setDoc(doc(db, "tasks", user.uid), { list: fixedTasks });
+      // יצירת משימות ברירת מחדל
+      const rawTasks = TASKS_BY_TYPE[form.eventType] || [];
+      await createDefaultTasks(rawTasks);
 
-    setCurrentUser({ uid: user.uid, ...form });
-    setStep("tasks");
-  }
-
-  // Login handler
-  async function handleLogin() {
-    // כאן אין צורך – Firebase כבר מטפל דרך onAuthStateChanged
+      // עדכון המשתמש הנוכחי
+      setCurrentUser({ uid: user.uid, ...form });
+      setStep("tasks");
+      
+    } catch (error) {
+      console.error("Error in registration:", error);
+      alert("שגיאה ברישום: " + error.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   // Logout handler
   async function handleLogout() {
-    await signOut(auth);
-    setCurrentUser(null);
-    setTasks([]);
-    setStep("login");
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
   }
 
-function handleAddTask(newTaskText) {
-  if (!newTaskText) return;
-
-  // רשימת משתמשים שמורשים לראות את המשימה
-  const allowedUsers = [currentUser.uid, "UID_OF_OTHER_USER"]; // אפשר להוסיף כמה משתמשים לפי הצורך
-
-  // שמירה ל-Firebase
-  addTodo(newTaskText, allowedUsers);
-
-  // הוספה ל-State כדי שה-UI יתעדכן מיד (optional)
-  setTasks((tasks) => [
-    { text: newTaskText, done: false, allowedUsers },
-    ...tasks
-  ]);
-}
-
-
-  // עריכת משימה קיימת
-  function handleEditTask(editedTask) {
-    setTasks((tasks) =>
-      tasks.map((task, i) => (i === editIndex ? editedTask : task))
-    );
-    setEditIndex(null);
+  // טיפול בלחיצה על משימה (החלפת סטטוס)
+  function handleTaskClick(taskId) {
+    toggleTask(taskId);
   }
 
-  function handleTaskClick(index) {
-    setTasks((tasks) =>
-      tasks.map((t, i) =>
-        i === index
-          ? { ...t, status: t.status === "done" ? "todo" : "done" }
-          : t
-      )
-    );
+  // טיפול בהגדרת תזכורת
+  function handleSetReminder(taskId, reminder) {
+    if (reminder && reminder.trim()) {
+      setReminder(taskId, reminder.trim());
+    }
   }
 
-  function handleSetReminder(index, reminder) {
-    setTasks((tasks) =>
-      tasks.map((t, i) => (i === index ? { ...t, reminder } : t))
-    );
-  }
-
+  // פתיחת מודל הוספת משימה
   function openAddTaskModal() {
-    setEditIndex(null);
+    setEditTaskId(null);
     setModalOpen(true);
   }
 
-  function openEditTaskModal(index) {
-    setEditIndex(index);
+  // פתיחת מודל עריכת משימה
+  function openEditTaskModal(taskId) {
+    setEditTaskId(taskId);
     setModalOpen(true);
+  }
+
+  // טיפול בשמירת משימה מהמודל
+  function handleSaveTask(taskData) {
+    if (editTaskId === null) {
+      // הוספת משימה חדשה
+      addTask(taskData.text);
+    } else {
+      // עריכת משימה קיימת - נעדכן את כל הנתונים
+      const task = tasks.find(t => t.id === editTaskId);
+      if (task) {
+        const updates = {
+          text: taskData.text,
+          status: taskData.status || task.status,
+          reminder: taskData.reminder || task.reminder
+        };
+        
+        // עדכון מספר שדות בבת אחת
+        const updatedTasks = tasks.map(t =>
+          t.id === editTaskId ? { ...t, ...updates } : t
+        );
+        
+        // כאן נשתמש בפונקציה saveTasks ישירות
+        const { saveTasks } = useTasks(currentUser);
+        saveTasks(updatedTasks);
+      }
+    }
+    
+    setModalOpen(false);
+    setEditTaskId(null);
+  }
+
+  // קבלת המשימה הנוכחית לעריכה
+  function getCurrentTask() {
+    if (editTaskId === null) return null;
+    return tasks.find(task => task.id === editTaskId) || null;
+  }
+
+  // אם עדיין טוען
+  if (loading) {
+    return (
+      <div className="app-container">
+        <div className="card">
+          <h2>טוען...</h2>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="app-container">
       {step === "login" && (
-        <Login
-          onLogin={handleLogin}
-          onRegister={() => setStep("register")}
-        />
+        <Login onRegister={() => setStep("register")} />
       )}
 
       {step === "register" && (
@@ -177,11 +188,11 @@ function handleAddTask(newTaskText) {
         />
       )}
 
-      {step === "tasks" && (
+      {step === "tasks" && currentUser && (
         <div className="card">
           <h2>
-            שלום {currentUser?.firstName || currentUser?.email}! המשימות שלך (
-            {currentUser?.eventType})
+            שלום {currentUser.firstName || currentUser.email}! המשימות שלך
+            {currentUser.eventType && ` (${currentUser.eventType})`}
           </h2>
           <button onClick={handleLogout}>התנתק</button>
           <TasksList
@@ -189,6 +200,7 @@ function handleAddTask(newTaskText) {
             onTaskClick={handleTaskClick}
             onSetReminder={handleSetReminder}
             onEdit={openEditTaskModal}
+            onDelete={deleteTask}
           />
         </div>
       )}
@@ -203,10 +215,10 @@ function handleAddTask(newTaskText) {
         open={modalOpen}
         onClose={() => {
           setModalOpen(false);
-          setEditIndex(null);
+          setEditTaskId(null);
         }}
-        onSave={editIndex === null ? handleAddTask : handleEditTask}
-        initialTask={editIndex === null ? null : tasks[editIndex]}
+        onSave={handleSaveTask}
+        initialTask={getCurrentTask()}
       />
     </div>
   );
