@@ -185,6 +185,7 @@ export default function App() {
         <Register
           onRegister={handleRegister}
           eventTypes={Object.keys(TASKS_BY_TYPE)}
+          onBackToLogin={() => setStep("login")}
         />
       )}
 
