@@ -4,11 +4,13 @@ import { motion } from 'framer-motion';
 import TasksList from './TasksList';
 import FloatingMenu from './FloatingMenu';
 import AddOrEditTaskModal from './AddOrEditTaskModal';
+import MemberManagementModal from './MemberManagementModal';
 import { useEventTasks } from '../hooks/useEventTasks';
 
 export default function EventView({ event, currentUser, onBackToDashboard }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editTaskId, setEditTaskId] = useState(null);
+  const [membersModalOpen, setMembersModalOpen] = useState(false);
 
   // שימוש ב-custom hook לניהול משימות האירוע
   const {
@@ -18,8 +20,20 @@ export default function EventView({ event, currentUser, onBackToDashboard }) {
     updateTask,
     setReminder,
     deleteTask,
-    addDefaultTasks
+    addDefaultTasks,
+    removeDefaultTasks
   } = useEventTasks(event.id);
+
+  // בדיקה האם יש משימות דיפולטיביות
+  const hasDefaultTasks = tasks.some(task => 
+    task.id && (task.id.startsWith('default_') || task.id.startsWith('additional_'))
+  );
+
+  // קביעה האם להציג כפתור הוספה או הסרה
+  const shouldShowDefaultTasksButton = event.type && event.type !== 'אחר';
+  const defaultTasksButtonText = hasDefaultTasks 
+    ? `הסר משימות דיפולטיביות עבור ${event.type}`
+    : `הוסף משימות ברירת מחדל עבור ${event.type}`;
 
   // פתיחת מודל הוספת משימה
   function openAddTaskModal() {
@@ -33,25 +47,43 @@ export default function EventView({ event, currentUser, onBackToDashboard }) {
     setModalOpen(true);
   }
 
-  // הוספת משימות דיפולטיביות
-  async function handleAddDefaultTasks() {
+  // הוספת/הסרת משימות דיפולטיביות
+  async function handleDefaultTasksAction() {
     if (!event.type || event.type === 'אחר') {
-      alert("לא ניתן להוסיף משימות ברירת מחדל לאירוע מסוג 'אחר'");
+      alert("לא ניתן לבצע פעולה זו לאירוע מסוג 'אחר'");
       return;
     }
 
-    const confirm = window.confirm(
-      `האם אתה בטוח שברצונך להוסיף את המשימות הדיפולטיביות עבור ${event.type}?`
-    );
-    
-    if (!confirm) return;
+    if (hasDefaultTasks) {
+      // הסרת משימות דיפולטיביות
+      const confirm = window.confirm(
+        `האם אתה בטוח שברצונך להסיר את כל המשימות הדיפולטיביות עבור ${event.type}?`
+      );
+      
+      if (!confirm) return;
 
-    const success = await addDefaultTasks(event.type);
-    
-    if (success) {
-      alert("המשימות הדיפולטיביות נוספו בהצלחה!");
+      const success = await removeDefaultTasks();
+      
+      if (success) {
+        alert("המשימות הדיפולטיביות הוסרו בהצלחה!");
+      } else {
+        alert("אירעה שגיאה בהסרת המשימות הדיפולטיביות");
+      }
     } else {
-      alert("אירעה שגיאה בהוספת המשימות הדיפולטיביות");
+      // הוספת משימות דיפולטיביות
+      const confirm = window.confirm(
+        `האם אתה בטוח שברצונך להוסיף את המשימות הדיפולטיביות עבור ${event.type}?`
+      );
+      
+      if (!confirm) return;
+
+      const success = await addDefaultTasks(event.type);
+      
+      if (success) {
+        alert("המשימות הדיפולטיביות נוספו בהצלחה!");
+      } else {
+        alert("אירעה שגיאה בהוספת המשימות הדיפולטיביות");
+      }
     }
   }
 
@@ -143,7 +175,7 @@ export default function EventView({ event, currentUser, onBackToDashboard }) {
               )}
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Users size={14} />
-                {event.members?.length || 1} משתתפים
+                {event.members?.length || 1} משתתף{(event.members?.length || 1) === 1 ? '' : 'ים'}
               </span>
             </div>
           </div>
@@ -209,13 +241,15 @@ export default function EventView({ event, currentUser, onBackToDashboard }) {
           </div>
         </div>
 
-        {/* כפתור הוספת משימות ברירת מחדל */}
-        {event.type && event.type !== 'אחר' && (
+        {/* כפתור הוספת/הסרת משימות ברירת מחדל */}
+        {shouldShowDefaultTasksButton && (
           <div style={{ marginBottom: '20px' }}>
             <button 
-              onClick={handleAddDefaultTasks}
+              onClick={handleDefaultTasksAction}
               style={{ 
-                background: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)', 
+                background: hasDefaultTasks 
+                  ? 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)'
+                  : 'linear-gradient(135deg, #28a745 0%, #20c997 100%)', 
                 color: 'white',
                 padding: '12px 20px',
                 borderRadius: '14px',
@@ -226,11 +260,13 @@ export default function EventView({ event, currentUser, onBackToDashboard }) {
                 alignItems: 'center',
                 gap: '8px',
                 cursor: 'pointer',
-                boxShadow: '0 4px 15px rgba(40, 167, 69, 0.3)'
+                boxShadow: hasDefaultTasks 
+                  ? '0 4px 15px rgba(231, 76, 60, 0.3)'
+                  : '0 4px 15px rgba(40, 167, 69, 0.3)'
               }}
             >
-              <Plus size={16} />
-              הוסף משימות ברירת מחדל עבור {event.type}
+              {hasDefaultTasks ? '🗑️' : <Plus size={16} />}
+              {defaultTasksButtonText}
             </button>
           </div>
         )}
@@ -247,7 +283,7 @@ export default function EventView({ event, currentUser, onBackToDashboard }) {
 
       {/* תפריט צף */}
       <FloatingMenu
-        onAddUser={() => alert("הוספת משתתפים - בקרוב!")}
+        onAddUser={() => setMembersModalOpen(true)}
         onAddTask={openAddTaskModal}
         onChatAI={() => alert("דו שיח עם AI - בקרוב!")}
       />
@@ -261,6 +297,14 @@ export default function EventView({ event, currentUser, onBackToDashboard }) {
         }}
         onSave={handleSaveTask}
         initialTask={getCurrentTask()}
+      />
+
+      {/* מודל ניהול משתתפים */}
+      <MemberManagementModal
+        open={membersModalOpen}
+        onClose={() => setMembersModalOpen(false)}
+        event={event}
+        currentUser={currentUser}
       />
     </div>
   );

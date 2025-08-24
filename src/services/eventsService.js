@@ -28,7 +28,8 @@ export async function createEvent(eventData) {
       ownerId: eventData.ownerId,
       members: eventData.members || [eventData.ownerId],
       createdAt: eventData.createdAt,
-      tasksCount: 0
+      tasksCount: 0,
+      hasDefaultTasks: eventData.addDefaultTasks && eventData.type !== 'אחר'
     });
 
     console.log('✅ Event created with ID:', eventRef.id);

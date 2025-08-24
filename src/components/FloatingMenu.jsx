@@ -74,7 +74,7 @@ export default function FloatingMenu({ onAddUser, onAddTask, onChatAI }) {
                 handleClose();
               }}
             >
-              👥 חבר משתמש
+              👥 הוסף משתתף
             </motion.button>
             <motion.button
               className="fab-action"

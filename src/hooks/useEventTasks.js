@@ -164,6 +164,35 @@ export function useEventTasks(eventId) {
     }
   };
 
+  // הסרת משימות דיפולטיביות
+  const removeDefaultTasks = async () => {
+    try {
+      console.log(`🗑️ Removing default tasks...`);
+      
+      // סנן רק משימות שלא דיפולטיביות
+      const nonDefaultTasks = tasks.filter(task => 
+        !task.id.startsWith('default_') && !task.id.startsWith('additional_')
+      );
+      
+      console.log(`📝 Keeping ${nonDefaultTasks.length} non-default tasks`);
+      console.log(`🗑️ Removing ${tasks.length - nonDefaultTasks.length} default tasks`);
+      
+      const result = await saveTasks(nonDefaultTasks);
+      
+      if (result) {
+        console.log(`✅ Successfully removed default tasks`);
+      } else {
+        console.log(`❌ Failed to remove default tasks`);
+      }
+      
+      return result;
+      
+    } catch (error) {
+      console.error("❌ Error removing default tasks:", error);
+      return false;
+    }
+  };
+
   return {
     tasks,
     loading,
@@ -174,6 +203,7 @@ export function useEventTasks(eventId) {
     setReminder,
     deleteTask,
     saveTasks,
-    addDefaultTasks
+    addDefaultTasks,
+    removeDefaultTasks
   };
 }
