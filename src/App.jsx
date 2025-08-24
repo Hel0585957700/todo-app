@@ -11,18 +11,8 @@ import AddOrEditTaskModal from "./components/AddOrEditTaskModal";
 
 // Services & Hooks
 import { subscribeToAuth, saveUserData } from "./services/userService";
+import { getAvailableEventTypes } from "./services/defaultTasksService";
 import { useTasks } from "./hooks/useTasks";
-
-// Data
-import GROOM_TASKS from "./data/groomTasks";
-import BRIDE_TASKS from "./data/brideTasks";
-import BAR_MITZVA_TASKS from "./data/barMitzvaTasks";
-
-const TASKS_BY_TYPE = {
-  חתן: GROOM_TASKS,
-  כלה: BRIDE_TASKS,
-  "בר מצווה": BAR_MITZVA_TASKS,
-};
 
 export default function App() {
   const [step, setStep] = useState("login");
@@ -30,17 +20,32 @@ export default function App() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editTaskId, setEditTaskId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [eventTypes, setEventTypes] = useState(['חתן', 'כלה', 'בר מצווה']);
 
   // שימוש ב-custom hook לניהול משימות
   const {
     tasks,
     addTask,
     toggleTask,
-    editTask,
+    updateTask,
     setReminder,
     deleteTask,
-    createDefaultTasks
+    createDefaultTasks,
+    addDefaultTasks
   } = useTasks(currentUser);
+
+  // טעינת סוגי אירועים מ-Firestore
+  useEffect(() => {
+    async function loadEventTypes() {
+      try {
+        const types = await getAvailableEventTypes();
+        setEventTypes(types);
+      } catch (error) {
+        console.error("Error loading event types:", error);
+      }
+    }
+    loadEventTypes();
+  }, []);
 
   // אזנה למצב התחברות Firebase
   useEffect(() => {
@@ -79,9 +84,12 @@ export default function App() {
         return;
       }
 
-      // יצירת משימות ברירת מחדל
-      const rawTasks = TASKS_BY_TYPE[form.eventType] || [];
-      await createDefaultTasks(rawTasks);
+      // יצירת משימות ברירת מחדל מ-Firestore
+      const tasksCreated = await createDefaultTasks(form.eventType);
+      
+      if (!tasksCreated) {
+        console.warn("No default tasks were created");
+      }
 
       // עדכון המשתמש הנוכחי
       setCurrentUser({ uid: user.uid, ...form });
@@ -128,29 +136,47 @@ export default function App() {
     setModalOpen(true);
   }
 
+  // הוספת משימות דיפולטיביות
+  async function handleAddDefaultTasks() {
+    if (!currentUser?.eventType) {
+      alert("לא ניתן לקבוע את סוג האירוע");
+      return;
+    }
+
+    const confirm = window.confirm(
+      `האם אתה בטוח שברצונך להוסיף את המשימות הדיפולטיביות עבור ${currentUser.eventType}?`
+    );
+    
+    if (!confirm) return;
+
+    const success = await addDefaultTasks(currentUser.eventType);
+    
+    if (success) {
+      alert("המשימות הדיפולטיביות נוספו בהצלחה!");
+    } else {
+      alert("אירעה שגיאה בהוספת המשימות הדיפולטיביות");
+    }
+  }
+
   // טיפול בשמירת משימה מהמודל
-  function handleSaveTask(taskData) {
+  async function handleSaveTask(taskData) {
     if (editTaskId === null) {
       // הוספת משימה חדשה
-      addTask(taskData.text);
+      await addTask(taskData.text, taskData.category, taskData.priority);
     } else {
-      // עריכת משימה קיימת - נעדכן את כל הנתונים
+      // עריכת משימה קיימת
       const task = tasks.find(t => t.id === editTaskId);
       if (task) {
         const updates = {
           text: taskData.text,
           status: taskData.status || task.status,
-          reminder: taskData.reminder || task.reminder
+          reminder: taskData.reminder || task.reminder,
+          category: taskData.category || task.category,
+          priority: taskData.priority || task.priority
         };
         
-        // עדכון מספר שדות בבת אחת
-        const updatedTasks = tasks.map(t =>
-          t.id === editTaskId ? { ...t, ...updates } : t
-        );
-        
-        // כאן נשתמש בפונקציה saveTasks ישירות
-        const { saveTasks } = useTasks(currentUser);
-        saveTasks(updatedTasks);
+        // שימוש ב-updateTask מה-hook הקיים
+        await updateTask(editTaskId, updates);
       }
     }
     
@@ -184,7 +210,7 @@ export default function App() {
       {step === "register" && (
         <Register
           onRegister={handleRegister}
-          eventTypes={Object.keys(TASKS_BY_TYPE)}
+          eventTypes={eventTypes}
           onBackToLogin={() => setStep("login")}
         />
       )}
@@ -195,7 +221,20 @@ export default function App() {
             שלום {currentUser.firstName || currentUser.email}! המשימות שלך
             {currentUser.eventType && ` (${currentUser.eventType})`}
           </h2>
-          <button onClick={handleLogout}>התנתק</button>
+          
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+            <button onClick={handleLogout}>התנתק</button>
+            <button 
+              onClick={handleAddDefaultTasks}
+              style={{ 
+                background: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)', 
+                color: 'white' 
+              }}
+            >
+              הוסף משימות ברירת מחדל
+            </button>
+          </div>
+          
           <TasksList
             tasks={tasks}
             onTaskClick={handleTaskClick}
