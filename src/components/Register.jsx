@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { signUp } from "../authService"; // <- אתה צריך ליצור את הקובץ הזה כמו ששלחתי קודם
+import { signUp } from "../authService";
 
-export default function Register({ onRegister, eventTypes }) {
+export default function Register({ onRegister, eventTypes, onBackToLogin }) {
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -9,7 +9,7 @@ export default function Register({ onRegister, eventTypes }) {
     firstName: "",
     lastName: "",
     nickname: "",
-    eventType: "",
+    eventType: "", // לא חובה יותר
   });
 
   const [loading, setLoading] = useState(false);
@@ -20,8 +20,9 @@ export default function Register({ onRegister, eventTypes }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!form.email || !form.password || !form.firstName || !form.eventType) {
-      alert("יש למלא את כל שדות החובה (כולל סיסמה)!");
+    // רק שם פרטי, אימייל וסיסמה חובה
+    if (!form.email || !form.password || !form.firstName) {
+      alert("יש למלא את כל שדות החובה (אימייל, סיסמה ושם פרטי)!");
       return;
     }
     setLoading(true);
@@ -29,11 +30,11 @@ export default function Register({ onRegister, eventTypes }) {
       // רישום אמיתי ב-Firebase
       await signUp(form.email, form.password);
 
-      // אחרי שנרשם — שמור גם פרטים אישיים באפליקציה שלך (Firestore, או רק בזיכרון)
+      // אחרי שנרשם — שמור גם פרטים אישיים באפליקציה
       if (onRegister) {
         onRegister(form);
       }
-      alert("נרשמת בהצלחה! אפשר להיכנס עם המייל והסיסמה שלך.");
+      alert("נרשמת בהצלחה! אפשר עכשיו לנהל אירועים.");
     } catch (error) {
       alert(error.message || "שגיאה ברישום");
     } finally {
@@ -48,7 +49,7 @@ export default function Register({ onRegister, eventTypes }) {
         <input
           type="email"
           name="email"
-          placeholder="אימייל"
+          placeholder="אימייל *"
           value={form.email}
           onChange={handleChange}
           required
@@ -56,22 +57,15 @@ export default function Register({ onRegister, eventTypes }) {
         <input
           type="password"
           name="password"
-          placeholder="סיסמה (לפחות 6 תווים)"
+          placeholder="סיסמה (לפחות 6 תווים) *"
           value={form.password}
           onChange={handleChange}
           required
           minLength={6}
         />
         <input
-          type="tel"
-          name="phone"
-          placeholder="מספר טלפון"
-          value={form.phone}
-          onChange={handleChange}
-        />
-        <input
           name="firstName"
-          placeholder="שם פרטי"
+          placeholder="שם פרטי *"
           value={form.firstName}
           onChange={handleChange}
           required
@@ -88,18 +82,32 @@ export default function Register({ onRegister, eventTypes }) {
           value={form.nickname}
           onChange={handleChange}
         />
+        <input
+          type="tel"
+          name="phone"
+          placeholder="מספר טלפון"
+          value={form.phone}
+          onChange={handleChange}
+        />
 
+        {/* סוג אירוע עכשיו אופציונלי - רק למידע */}
         <div style={{ margin: "20px 0" }}>
           <label
-            style={{ fontWeight: "bold", display: "block", marginBottom: 8 }}
+            style={{ 
+              fontWeight: "600", 
+              display: "block", 
+              marginBottom: 8,
+              color: "#666",
+              fontSize: "0.9rem"
+            }}
           >
-            בחר סוג אירוע:
+            איזה סוג אירוע אתה מתכנן? (אופציונלי)
           </label>
           <div
             style={{
               display: "flex",
               flexWrap: "wrap",
-              gap: "10px",
+              gap: "8px",
               justifyContent: "center",
             }}
           >
@@ -112,26 +120,54 @@ export default function Register({ onRegister, eventTypes }) {
                 }`}
                 onClick={() => setForm({ ...form, eventType: type })}
                 style={{
-                  padding: "12px 18px",
-                  borderRadius: "14px",
+                  padding: "10px 16px",
+                  borderRadius: "12px",
                   border:
                     form.eventType === type
                       ? "2px solid #4253f0"
                       : "1px solid #ddd",
                   background: form.eventType === type ? "#f0f4ff" : "#fff",
-                  fontWeight: 600,
+                  fontWeight: 500,
                   cursor: "pointer",
+                  fontSize: "0.85rem"
                 }}
               >
                 {type}
               </button>
             ))}
           </div>
+          <p style={{ 
+            fontSize: "0.8rem", 
+            color: "#999", 
+            textAlign: "center", 
+            marginTop: "8px" 
+          }}>
+            תוכל ליצור ולנהל מספר אירועים אחרי ההרשמה
+          </p>
         </div>
+
         <button type="submit" style={{ width: "100%" }} disabled={loading}>
           {loading ? "נרשם..." : "הירשם והמשך"}
         </button>
       </form>
+
+      <hr style={{ margin: "20px 0" }} />
+
+      <div style={{ textAlign: "center" }}>
+        <p style={{ marginBottom: "10px" }}>כבר יש לי חשבון?</p>
+        <button 
+          type="button"
+          onClick={onBackToLogin}
+          style={{
+            background: "transparent",
+            color: "#4253f0",
+            border: "2px solid #4253f0",
+            fontWeight: "600"
+          }}
+        >
+          חזור לכניסה
+        </button>
+      </div>
     </div>
   );
 }
